@@ -1,0 +1,11 @@
+node_modules/
+.expo/
+dist/
+expo-env.d.ts
+
+/android/
+/ios/
+/modules/*/android/build/
+/modules/*/android/.gradle/
+
+*.log

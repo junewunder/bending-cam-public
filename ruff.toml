@@ -1,0 +1,15 @@
+line-length = 88
+target-version = "py37"
+
+exclude = [
+    "vendor",
+    "backup",
+    "typings",
+    ".venv",
+    ".claude/skills",
+    ".agents/skills",
+]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = ["B007"]

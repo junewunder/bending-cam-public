@@ -1,0 +1,67 @@
+_default:
+    @just --justfile {{source_file()}} --list
+
+setup:
+    pnpm install
+
+auth:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    fail=0
+    if [ -z "${ANDROID_HOME:-}${ANDROID_SDK_ROOT:-}" ]; then
+        echo "MISSING  ANDROID_HOME"
+        fail=1
+    else
+        echo "ok       Android SDK at ${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+    fi
+    jdk=$(java -version 2>&1 | head -1 | grep -oE '"[0-9]+' | tr -d '"')
+    if [ "${jdk:-0}" -ge 22 ] || [ "${jdk:-0}" -lt 17 ]; then
+        echo "MISSING  JDK 17 or 21 (found ${jdk:-none})"
+        fail=1
+    else
+        echo "ok       JDK $jdk"
+    fi
+    if [ -d node_modules ]; then echo "ok       node_modules"; else echo "MISSING  node_modules: just phone setup"; fail=1; fi
+    if adb get-state >/dev/null 2>&1; then echo "ok       a phone on adb"; else echo "note     no phone on adb"; fi
+    exit $fail
+
+prebuild:
+    pnpm exec expo prebuild --platform android --clean
+
+run:
+    pnpm exec expo run:android
+
+start:
+    pnpm exec expo start --dev-client
+
+release:
+    pnpm exec expo run:android --variant release
+
+publish:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    signing=${RELEASE_SIGNING:-}
+    [ -f "$signing" ] || { echo "No release key: set RELEASE_SIGNING to the signing properties file."; exit 1; }
+    [ -z "$(git status --porcelain)" ] || { echo "Commit first: a published build is a commit."; exit 1; }
+    git fetch -q --prune origin
+    [ -n "$(git branch -r --contains HEAD)" ] || { echo "Push first: the release tags this commit on GitHub."; exit 1; }
+    last=$(gh release list --limit 100 --json tagName -q '[.[].tagName | select(test("^r[0-9]+$")) | ltrimstr("r") | tonumber] | max // 1')
+    n=$((last + 1))
+    pnpm exec expo prebuild --platform android --clean
+    (cd android && ./gradlew assembleRelease -PreleaseSigning="$signing" \
+        -PversionCode=$n -PversionName=r$n -PreactNativeArchitectures=arm64-v8a)
+    apk=$(mktemp -d)/bendcam-r$n.apk
+    cp android/app/build/outputs/apk/release/app-release.apk "$apk"
+    gh release create r$n "$apk" --target "$(git rev-parse HEAD)" --title r$n --notes "$(git log -1 --format=%s -- .)"
+
+typecheck:
+    pnpm exec tsc --noEmit
+
+doctor:
+    pnpm exec expo install --check
+
+logcat:
+    adb logcat --pid=$(adb shell pidof -s com.junewunder.bendcam)
+
+clean:
+    rm -rf android ios .expo dist
