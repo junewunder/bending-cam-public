@@ -96,7 +96,9 @@ ui-export:
     set -euo pipefail
     exec python3 tools/ui_export.py
 
-ui follow="15": ui-export
+ui follow="15": ui-export (ui-push follow)
+
+ui-push follow="15":
     #!/usr/bin/env bash
     set -euo pipefail
     exec python3 tools/push_code.py src/ui.bin --as ui.bin --follow {{follow}}
