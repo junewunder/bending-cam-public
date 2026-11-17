@@ -43,7 +43,7 @@ render, not a photo.*
 | Firmware | Preview, shutter, saving to SD, settings, review, Bluetooth, crash recovery | `src/code.py` | 2,613 |
 | Runtime | The component and event runtime the firmware is written on | `src/willow.py` | 457 |
 | Bring-up scripts | One hardware stage each: display, camera, shutter and SD, BLE, still timing | `src/bringup/` | 972 |
-| Simulator, fuzzer, tests | Fake CircuitPython modules, scenarios, the trace diff, random runs, the runtime's tests | `tools/sim/` | 1,414 |
+| Simulator, fuzzer, tests | Fake CircuitPython modules, scenarios, the trace diff, random runs, the runtime's tests | `tools/sim/` | 1,477 |
 | Phone app | Settings, photo transfer and review over BLE (Expo / React Native, Kotlin modules) | `phone/` | 3,730 |
 | Circuit board | The v3 mainboard as tscircuit code, earlier test boards, fab tools | `pcb/` | 1,753 |
 | Host tools | Deploying to the board, BLE from a laptop, BMP to JPEG, UI art export | `tools/`, `justfile` | 1,852 |
@@ -59,7 +59,7 @@ just sim      # 18 of 18 scenarios the same, in under 2 s
 just fuzz     # 0 of 200 seeds failed, in about 25 s
 just dev      # once: a .venv with the CircuitPython 10.3.0 stubs for this board
 just check    # ruff: All checks passed; pyright: 0 errors
-just test     # 8 tests of the runtime, OK
+just test     # 13 tests of the runtime, OK
 ```
 
 `just sim`, `just fuzz` and `just test` use only the standard library. For the phone app,
@@ -157,15 +157,23 @@ Under that rule, a debounce built as "cancel, then start a timer" on every
 change never fires (run it: `slow ends None` both times). In `src/willow.py`,
 a cancel only reaches a pending timer.
 
-`just test` runs 8 unit tests of these rules against `src/willow.py` on
-CPython.
+`just test` runs 13 unit tests of these rules against `src/willow.py` on
+CPython. If you know React, the batching will look familiar: setters land at
+the next render, as `setState` does. `emit` is closer to the DOM's
+`dispatchEvent`, which also runs its listeners before it returns.
 
 Hardware handles come in through each component's `open()`, which is what
 lets the simulator swap the hardware out. `Main` builds the tree and wires the
 handles, and its loop, `Main.run()`, is the one place that calls components
 directly: it schedules the work that shares a frame, the SPI bus and the
-radio, in the order the hardware needs. The board's pins are at the top of `src/code.py`, and its settings,
-the ones the phone shows, are in the `SETTINGS` table below them.
+radio, in the order the hardware needs. Not everything is state. What the
+hardware is doing right now (the open SD card, the presses waiting, whether
+the panel needs re-anchoring) lives in plain fields that `Main.run()` and the
+components read and write directly, because a value that lands a tick late is
+a frame late. Only state goes through the tick.
+
+The board's pins are at the top of `src/code.py`, and its settings, the ones
+the phone shows, are in the `SETTINGS` table below them.
 
 What happens on a press:
 
@@ -183,8 +191,9 @@ data line stuck, a JPEG capture times out on every shot. Raw RGB565 has no
 framing and comes through bent. The phone app turns them into JPEGs for the
 gallery and keeps the BMPs; `just convert` does the same on a laptop.
 
-The camera also looks after itself. A 10 s watchdog resets it if the loop
-stalls. After an error it resets, and after 3 crashes in a row without 30 s
+The camera also looks after itself. A 10 s watchdog resets it if the main
+loop stalls; it's armed at the end of boot, so a hang while the drivers start
+isn't covered. After an error it resets, and after 3 crashes in a row without 30 s
 of healthy running, it stops and says why on the screen instead of looping.
 If frames stop coming, it rebuilds the camera driver, backing off from 4 s to
 60 s between tries; if frames keep coming but stop changing, it reports a
@@ -249,9 +258,15 @@ the next board.
 
 ## The circuit board
 
-`pcb/v3/v3.circuit.tsx` describes the mainboard in tscircuit: parts, pin
-assignments, traces and silkscreen, on a 100x100 mm two-layer board with
-through-hole parts. The netlist and fabrication files are generated from it.
+The v3 mainboard is a carrier board. The DevKitC and the two Adafruit
+breakouts plug into it on headers, and it routes between them and adds the
+cartridge header, RN1, the shutter button and an I2C port. It has no power
+stage of its own: it runs from the DevKitC's USB port and 3.3 V regulator.
+It's 100x100 mm, two layers, all through-hole.
+
+`pcb/v3/v3.circuit.tsx` describes it in tscircuit: parts, pin assignments,
+traces and silkscreen. The netlist and fabrication files are generated from
+it.
 
 ```sh
 just pcb-setup        # install tscircuit (bun)
@@ -290,6 +305,7 @@ just flash            # write CircuitPython 10.3.0 to the board
 just fetch-bundle     # download Adafruit's library bundle
 just libs             # copy the one library the firmware needs to the board
 just willow           # deploy the runtime
+just ui-push          # deploy the status art, src/ui.bin
 just push src/code.py # deploy the firmware and watch it start
 just console          # a serial console
 ```
