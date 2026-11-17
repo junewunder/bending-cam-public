@@ -402,18 +402,27 @@ pcb-parts:
 
 tsci := justfile_directory() / "pcb/node_modules/.bin/tsci"
 
-pcb-build board="test00":
+pcb-setup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v bun >/dev/null || { echo "needs bun: https://bun.sh" >&2; exit 1; }
+    cd pcb && bun install --frozen-lockfile
+
+_tsci:
+    @[ -x "{{tsci}}" ] || { echo "no tscircuit in pcb/node_modules: run 'just pcb-setup' first" >&2; exit 1; }
+
+pcb-build board="test00": _tsci
     #!/usr/bin/env bash
     set -euo pipefail
     cd pcb && {{tsci}} build {{board}}/{{board}}.circuit.tsx --pcb-png
     echo "-> pcb/dist/{{board}}/{{board}}/pcb.png"
 
-pcb-netlist board="test00":
+pcb-netlist board="test00": _tsci
     #!/usr/bin/env bash
     set -euo pipefail
     cd pcb && {{tsci}} check netlist {{board}}/{{board}}.circuit.tsx
 
-pcb-export board="test00":
+pcb-export board="test00": _tsci
     #!/usr/bin/env bash
     set -euo pipefail
     cd pcb/{{board}}
