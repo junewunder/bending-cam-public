@@ -43,10 +43,10 @@ render, not a photo.*
 | Firmware | Preview, shutter, saving to SD, settings, review, Bluetooth, crash recovery | `src/code.py` | 2,613 |
 | Runtime | The component and event runtime the firmware is written on | `src/willow.py` | 457 |
 | Bring-up scripts | One hardware stage each: display, camera, shutter and SD, BLE, still timing | `src/bringup/` | 972 |
-| Simulator and fuzzer | Fake CircuitPython modules, scenarios, the trace diff, random runs | `tools/sim/` | 1,259 |
+| Simulator, fuzzer, tests | Fake CircuitPython modules, scenarios, the trace diff, random runs, the runtime's tests | `tools/sim/` | 1,414 |
 | Phone app | Settings, photo transfer and review over BLE (Expo / React Native, Kotlin modules) | `phone/` | 3,730 |
 | Circuit board | The v3 mainboard as tscircuit code, earlier test boards, fab tools | `pcb/` | 1,753 |
-| Host tools | Deploying to the board, BLE from a laptop, BMP to JPEG, UI art export | `tools/`, `justfile` | 1,838 |
+| Host tools | Deploying to the board, BLE from a laptop, BMP to JPEG, UI art export | `tools/`, `justfile` | 1,852 |
 
 ## Try it without the hardware
 
