@@ -11,9 +11,16 @@ its photos over Bluetooth. The circuit board is written as code.
 This repo holds all of it: the firmware, the phone app, the board, and a
 simulator that runs two builds of the firmware against fake hardware and diffs
 every hardware call they make, so a refactor can be checked before it touches
-the board. I built it by directing AI coding agents. Writing code got cheap
-that way; reviewing it didn't, so most of my effort went into checks a machine
-runs: the simulator, a fuzzer, and the lint and type checks.
+the board. The v3 board in `pcb/v3` is built and runs this firmware.
+
+I built bendcam by directing AI coding agents: they wrote the code, and I
+decided what the camera should do, tried it on the bench, and chose
+what got checked and how. Writing code got cheap that way, but reviewing it
+didn't, so the checks are where I put my own work: the simulator, the fuzzer,
+and lint and type checks on the firmware and the app.
+
+If you're here to bend a camera, skip to [Bends](#bends) and
+[Building one](#building-one).
 
 ![The v3 mainboard, top side, as `just pcb-render v3` draws it](docs/v3-top.png)
 
@@ -108,19 +115,36 @@ all, no shot was ever taken, nothing broke a rule, and 0 of 150 seeds failed;
 
 What the fakes don't model: hard faults, heap fragmentation, garbage
 collection pauses, real SPI and Bluetooth timing, and button debounce. Those
-still need the board.
+still need the board. The fakes are also written to the same understanding of
+the hardware as the firmware, so `same` means two builds behave alike against
+them, not that either is right on the board.
 
 ## The firmware
 
 `src/code.py` is a tree of components (`Shutter`, `Saver`, `Card`, `Panel`,
 `Camera`, `Look`, `Link`, `Outbox`, `Settings`, `Review`) on
 `src/willow.py`, a small runtime based on Willow, a reactive programming model
-from my research. No component calls another. They talk through events, which
-run their listeners right away, and state changes, which land on the next
-tick, so every render sees one consistent state. Hardware handles come in
-through each component's `open()`, which is what lets the simulator swap the
-hardware out. The main loop still schedules the work that shares a frame, the
-SPI bus and the radio, in the order the hardware needs.
+from my research that isn't published yet. No component calls another. They
+talk through events and state:
+
+- `self.emit(label, payload)` runs every listener of that label before it
+  returns. `bind`, `once`, `remove`, `after` and `cancel` take effect at once.
+- A state setter only queues the new value. Each `tick()` dispatches the
+  drivers' events (a key press, a frame), applies the queued values, fires due
+  timers, then renders the tree. A component's `@on("x", "y")` blocks run only
+  when `x` or `y` changed, so every render sees one consistent state.
+- The update queue, event queue and timer table are fixed-size arrays (64
+  updates, 16 events, 16 timers), allocated once, because on the
+  microcontroller a garbage collection pass costs frames. Emits nested 8 deep
+  raise an error, since that means a cycle.
+- `src/willow.pyi` types it for pyright: `x, set_x = state(0)` gives a value
+  and a typed `Setter`.
+
+Hardware handles come in through each component's `open()`, which is what
+lets the simulator swap the hardware out. The main loop still schedules the
+work that shares a frame, the SPI bus and the radio, in the order the hardware
+needs. The board's pins are at the top of `src/code.py`, and its settings,
+the ones the phone shows, are in the `SETTINGS` table below them.
 
 What happens on a press:
 
@@ -157,15 +181,27 @@ hue shift, but the brightness mostly survives, so the picture stays readable
 underneath. It costs nothing per pixel and can't hang the camera. It changes
 the screen and the `_screen` copy, not the 1024x768 still.
 
-Hardware bends go through the cartridge header, J2, a 2x16 pin header. The
-camera's eight data lines (D2 to D9) come in on one row and go out to the
-ESP32 on the other, and only a cartridge joins them, so a cartridge can swap
-bits, tie them high or low, or mix in noise. With no cartridge fitted, the
-8x10k resistor network RN1 holds the ESP32's side low. The sync lines,
-power, ground and I2C are joined on the board. The header mates all 32 pins in
-whatever order a cartridge rocks in, so swap cartridges with the power off.
-Nothing keys it: a cartridge fitted backwards can short two camera outputs.
-That's a known hazard on this board revision.
+Hardware bends go through the cartridge header, J2, a 2x16 pin header. Each
+of its 16 columns has two pins: row A goes to the camera, row B to the ESP32.
+
+| Column | 1-8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
+|---|---|---|---|---|---|---|---|---|---|
+| Signal | D2-D9 | PCLK | HREF | VSYNC | GND | SDA | SCL | 3V3 | CART |
+| A and B joined on the board | no | yes | yes | yes | yes | yes | yes | yes | yes |
+
+Column 1 is at the right-hand end, as in the render above. For the eight data
+lines (D2 to D9), only a cartridge joins A to B. Eight jumper shunts across
+columns 1 to 8 make a straight-through cartridge and a normal picture; from
+there a cartridge can cross bits over, tie the ESP32's side to 3V3 or GND,
+or mix in noise. With no cartridge fitted, the 8x10k resistor network RN1 holds the
+ESP32's side low. CART goes to IO14; this firmware doesn't read it yet.
+
+The header mates all 32 pins in whatever order a cartridge rocks in, so swap
+cartridges with the power off. Nothing keys it, and a cartridge fitted
+backwards or one column over can short two camera outputs. I kept the header
+plain on this revision on purpose. The fixes (splitting it into two keyed
+2x8 blocks, alignment posts) don't change the pinout, so they can wait for
+the next board.
 
 ## The circuit board
 
@@ -180,8 +216,10 @@ just pcb-copper v3    # 0 shorts, 0 pad clashes; GND is joined by the pour
 just pcb-fab v3       # KiCad DRC, then gerbers and drill files in v3-fab.zip
 ```
 
-In my run, `just pcb-fab v3` reported 18 DRC violations, all warnings about
-library footprints, and 0 errors. It needs `kicad-cli`; with the Flatpak
+In my run, `just pcb-fab v3` reported 0 errors and 18 warnings, one per
+footprint, each saying KiCad's configuration doesn't include the `tscircuit`
+footprint library. The footprints are embedded in the exported board, so the
+warnings don't affect the gerbers. It needs `kicad-cli`; with the Flatpak
 KiCad, clone somewhere under your home directory, since the sandbox can't see
 `/tmp`. `pcb/tools/` holds the copper clearance check and the step that
 finishes the files for fabrication. `pcb/test00` and the `probe` boards are
@@ -217,6 +255,26 @@ installs `src/boot.py`, which hides the CIRCUITPY drive at power-on so the
 camera can run unplugged; after that, `just devmode` brings the drive back for
 one boot. `just bringup <n>` runs one of the bring-up scripts instead of the
 firmware. `just --list` shows the rest.
+
+## Learned on the bench
+
+Some of the firmware and tooling only makes sense with what the board taught
+me:
+
+- **The sensor clock.** On EXT, the OV5640 never answers on I2C and holds its
+  data lines high-impedance, which looks exactly like a wiring fault. Hence
+  `external_clock_pin=None` and the INT jumper.
+- **Copying to the board.** A plain `cp` to CIRCUITPY while `code.py` runs is
+  silently lost, and a host-side compare still says it landed. `just push`
+  stops the program at the REPL over serial, writes the file, and checks it
+  from the board's side.
+- **A failed SD init.** If `sdcardio.SDCard()` fails on a bare pin, the next
+  garbage collection crashes. `Card.attach` keeps one `DigitalInOut` for the
+  chip select and reuses it.
+- **Bluetooth.** With more than one characteristic in a service, a soft reload
+  hard-faulted, so each BLE service has one characteristic.
+- **Power.** A dip in the supply, from a powered card insert or a bad USB
+  cable, browns the board out or drops it off USB with nothing logged.
 
 ## About this snapshot
 
