@@ -88,8 +88,10 @@ back `same` on all 18. A change in behavior shows up as a diff to explain.
 The clock only moves when the hardware would take time (a frame, a sleep, a
 card write at a modelled 1 MB/s), never on a read, so a build that checks the
 time more often still gets the same trace. When a change moves work from one
-frame to the next on purpose, `--by-kind` compares each kind of line in order
-and leaves the frame markers out.
+frame to the next on purpose, `--by-kind` compares sensor writes, card files,
+nvm, Bluetooth, camera calls and prints, each kind in order on its own. It
+leaves out the frame markers, the panel and the watchdog, so a `same` from
+`--by-kind` says nothing about what was drawn.
 
 `just fuzz` builds a random scenario per seed and checks the run against rules
 rather than another build: the run ends normally, nothing crashes, the
@@ -173,7 +175,8 @@ components read and write directly, because a value that lands a tick late is
 a frame late. Only state goes through the tick.
 
 The board's pins are at the top of `src/code.py`, and its settings, the ones
-the phone shows, are in the `SETTINGS` table below them.
+the phone shows, are in the `SETTINGS` table below them. The `shift` bend is
+`Panel.shift()` and the blit around it.
 
 What happens on a press:
 
@@ -310,12 +313,19 @@ just push src/code.py # deploy the firmware and watch it start
 just console          # a serial console
 ```
 
-`just flash` expects the CircuitPython `.bin` under `vendor/`; download it from
-circuitpython.org for the `espressif_esp32s3_devkitc_1_n8r8` board. `just boot`
+`just flash` uses `esptool` and expects the CircuitPython `.bin` under
+`vendor/`; download it from circuitpython.org for the
+`espressif_esp32s3_devkitc_1_n8r8` board. `just bootloader` puts the board in
+download mode, or hold BOOT and tap RST. `just boot`
 installs `src/boot.py`, which hides the CIRCUITPY drive at power-on so the
 camera can run unplugged; after that, `just devmode` brings the drive back for
-one boot. `just bringup <n>` runs one of the bring-up scripts instead of the
-firmware. `just --list` shows the rest.
+one boot.
+
+On a new board, the bring-up scripts check one stage at a time before the
+firmware: `just bringup 01` for the display, `03` for the camera, `03b` for a
+live preview, `04` for the shutter and SD card, `05` for Bluetooth throughput
+and `06` for still timing. Each one replaces `code.py` on the board until you
+push the firmware again. `just --list` shows the rest.
 
 ## About this snapshot
 
