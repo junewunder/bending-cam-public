@@ -150,12 +150,11 @@ talk through events and state:
 - `src/willow.pyi` types it for pyright: `x, set_x = state(0)` gives a value
   and a typed `Setter`.
 
-The runtime departs from the research model where the firmware needed it to.
-One example is in `tools/sim/calculus_debounce.py`: under the model's rule, a
-cancel with no timer pending is kept and swallows the next timer, so a
-debounce built as "cancel, then start a timer" on every change never fires
-(run it: `slow ends None` both times). In `src/willow.py`, a cancel only
-reaches a pending timer.
+`tools/sim/calculus_debounce.py` is a small model of a different cancel rule,
+one where a cancel with no timer pending is kept and swallows the next timer.
+Under that rule, a debounce built as "cancel, then start a timer" on every
+change never fires (run it: `slow ends None` both times). In `src/willow.py`,
+a cancel only reaches a pending timer.
 
 Hardware handles come in through each component's `open()`, which is what
 lets the simulator swap the hardware out. The main loop still schedules the
