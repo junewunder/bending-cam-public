@@ -20,7 +20,16 @@ didn't, so the checks are where I put my own work: the simulator, the fuzzer,
 and lint and type checks on the firmware and the app.
 
 If you're here to bend a camera, skip to [Bends](#bends) and
-[Building one](#building-one).
+[Building one](#building-one). If you have five minutes for the code, these
+are the places to look:
+
+- `tools/sim/run.py`: the trace diff, and `by_kind` for changes that move
+  work between frames.
+- `tools/sim/fuzz.py`, `check()` at line 126: the rules every random run must
+  keep.
+- `src/willow.py`, `flush()` at line 372 and `tick()` below it: the order a
+  tick runs in.
+- `src/code.py`, `Main.run()` at line 2435: the camera's main loop.
 
 ![The v3 mainboard, top side, as `just pcb-render v3` draws it](docs/v3-top.png)
 
@@ -114,7 +123,8 @@ all, no shot was ever taken, nothing broke a rule, and 0 of 150 seeds failed;
 `just sim` flagged 13 of 18 scenarios.
 
 What the fakes don't model: hard faults, heap fragmentation, garbage
-collection pauses, real SPI and Bluetooth timing, and button debounce. Those
+collection pauses, real SPI and Bluetooth timing, and button debounce (the
+firmware leaves that to CircuitPython's `keypad`, scanning every 20 ms). Those
 still need the board. The fakes are also written to the same understanding of
 the hardware as the firmware, so `same` means two builds behave alike against
 them, not that either is right on the board.
@@ -140,6 +150,13 @@ talk through events and state:
 - `src/willow.pyi` types it for pyright: `x, set_x = state(0)` gives a value
   and a typed `Setter`.
 
+The runtime departs from the research model where the firmware needed it to.
+One example is in `tools/sim/calculus_debounce.py`: under the model's rule, a
+cancel with no timer pending is kept and swallows the next timer, so a
+debounce built as "cancel, then start a timer" on every change never fires
+(run it: `slow ends None` both times). In `src/willow.py`, a cancel only
+reaches a pending timer.
+
 Hardware handles come in through each component's `open()`, which is what
 lets the simulator swap the hardware out. The main loop still schedules the
 work that shares a frame, the SPI bus and the radio, in the order the hardware
@@ -156,7 +173,10 @@ What happens on a press:
    pulled, the still waits in RAM and is saved when a card comes back. If
    there isn't room in RAM for another still, the press is refused.
 
-Both files are RGB565 BMPs. The phone app turns them into JPEGs for the
+Both files are RGB565 BMPs, not JPEGs, because of the bends. The driver
+drops any JPEG frame that doesn't start with the bytes `FF D8 FF`, so with one
+data line stuck, a JPEG capture times out on every shot. Raw RGB565 has no
+framing and comes through bent. The phone app turns them into JPEGs for the
 gallery and keeps the BMPs; `just convert` does the same on a laptop.
 
 The camera also looks after itself. A 10 s watchdog resets it if the loop
