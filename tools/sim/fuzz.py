@@ -154,13 +154,17 @@ def check(w):
             last = n
     captured = [int(n) for n in re.findall(r"print: captured shot (\d+)", "\n".join(tr))]
     text = "\n".join(tr)
+    unwritten = re.search(r"print: !! (\d+) stills not written", text)
+    missing = []
     for n in captured:
         name = "IMG_{:04d}.bmp".format(n)
         if ("saved /sd/" + name) in text or ("/sd/" + name + " lost") in text:
             continue
-        if "stills not written" in text:
-            continue
-        bad.append("shot {}'s still neither saved nor lost".format(n))
+        missing.append(n)
+    excused = int(unwritten.group(1)) if unwritten else 0
+    if len(missing) > excused:
+        bad.append("{} shot(s) neither saved nor lost, {} reported unwritten: {}".format(
+            len(missing), excused, missing[:6]))
     for name, data in w.card.files.items():
         s = SHOT.search(name)
         if s:
