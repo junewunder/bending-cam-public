@@ -76,6 +76,11 @@ sim *args:
     set -euo pipefail
     exec python3 tools/sim/run.py {{args}}
 
+test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    exec python3 tools/sim/test_willow.py
+
 fuzz *args:
     #!/usr/bin/env bash
     set -euo pipefail
