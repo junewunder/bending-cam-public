@@ -13,9 +13,9 @@ simulator that runs two builds of the firmware against fake hardware and diffs
 every hardware call they make, so a refactor can be checked before it touches
 the board. The v3 board in `pcb/v3` is built and runs this firmware.
 
-I built bendcam by directing AI coding agents: they wrote the code, and I
-decided what the camera should do, tried it on the bench, and chose
-what got checked and how. Writing code got cheap that way, but reviewing it
+I built bendcam by directing AI coding agents. They wrote the code; I decided
+what the camera should do, tried it on the bench, and chose what got checked
+and how. Writing code got cheap that way, but reviewing it
 didn't, so the checks are where I put my own work: the simulator, the fuzzer,
 and lint and type checks on the firmware and the app.
 
@@ -62,9 +62,9 @@ just check    # ruff: All checks passed; pyright: 0 errors
 just test     # 13 tests of the runtime, OK
 ```
 
-`just sim`, `just fuzz` and `just test` use only the standard library. For the phone app,
-`just phone setup` then `just phone typecheck` installs it with pnpm and
-type-checks it; running it needs the Android SDK and a JDK (`just phone auth`
+`just sim`, `just fuzz` and `just test` use only the standard library. For
+the phone app, `just phone setup` then `just phone typecheck` installs it with
+pnpm and type-checks it; running it needs the Android SDK and a JDK (`just phone auth`
 says what's missing), and it has a fake camera you can switch on in the app.
 For the board, `just pcb-setup` installs tscircuit with bun, then
 `just pcb-build v3` builds it.
@@ -172,7 +172,7 @@ radio, in the order the hardware needs. Not everything is state. What the
 hardware is doing right now (the open SD card, the presses waiting, whether
 the panel needs re-anchoring) lives in plain fields that `Main.run()` and the
 components read and write directly, because a value that lands a tick late is
-a frame late. Only state goes through the tick.
+a frame late.
 
 The board's pins are at the top of `src/code.py`, and its settings, the ones
 the phone shows, are in the `SETTINGS` table below them. The `shift` bend is
@@ -196,8 +196,9 @@ gallery and keeps the BMPs; `just convert` does the same on a laptop.
 
 The camera also looks after itself. A 10 s watchdog resets it if the main
 loop stalls; it's armed at the end of boot, so a hang while the drivers start
-isn't covered. After an error it resets, and after 3 crashes in a row without 30 s
-of healthy running, it stops and says why on the screen instead of looping.
+isn't covered. After an error it resets, and after 3 crashes in a row without
+30 s of healthy running, it stops and says why on the screen instead of
+looping.
 If frames stop coming, it rebuilds the camera driver, backing off from 4 s to
 60 s between tries; if frames keep coming but stop changing, it reports a
 frozen picture. Settings from the phone survive power cycles, and holding the
@@ -210,22 +211,21 @@ between captures and writes them again after every size change.
 
 ## Learned on the bench
 
-Some of the firmware and tooling only makes sense with what the board taught
-me:
+Parts of the firmware and tooling come from things the board taught me:
 
-- **The sensor clock.** On EXT, the OV5640 never answers on I2C and holds its
+- The sensor clock. On EXT, the OV5640 never answers on I2C and holds its
   data lines high-impedance, which looks exactly like a wiring fault. Hence
   `external_clock_pin=None` and the INT jumper.
-- **Copying to the board.** A plain `cp` to CIRCUITPY while `code.py` runs is
+- Copying to the board. A plain `cp` to CIRCUITPY while `code.py` runs is
   silently lost, and a host-side compare still says it landed. `just push`
   stops the program at the REPL over serial, writes the file, and checks it
   from the board's side.
-- **A failed SD init.** If `sdcardio.SDCard()` fails on a bare pin, the next
+- A failed SD init. If `sdcardio.SDCard()` fails on a bare pin, the next
   garbage collection crashes. `Card.attach` keeps one `DigitalInOut` for the
   chip select and reuses it.
-- **Bluetooth.** With more than one characteristic in a service, a soft reload
+- Bluetooth. With more than one characteristic in a service, a soft reload
   hard-faulted, so each BLE service has one characteristic.
-- **Power.** A dip in the supply, from a powered card insert or a bad USB
+- Power. A dip in the supply, from a powered card insert or a bad USB
   cable, browns the board out or drops it off USB with nothing logged.
 
 ## Bends
@@ -249,8 +249,8 @@ Column 1 is at the right-hand end, as in the render above. For the eight data
 lines (D2 to D9), only a cartridge joins A to B. Eight jumper shunts across
 columns 1 to 8 make a straight-through cartridge and a normal picture; from
 there a cartridge can cross bits over, tie the ESP32's side to 3V3 or GND,
-or mix in noise. With no cartridge fitted, the 8x10k resistor network RN1 holds the
-ESP32's side low. CART goes to IO14; this firmware doesn't read it yet.
+or mix in noise. With no cartridge fitted, the 8x10k resistor network RN1
+holds the ESP32's side low. CART goes to IO14; this firmware doesn't read it yet.
 
 The header mates all 32 pins in whatever order a cartridge rocks in, so swap
 cartridges with the power off. Nothing keys it, and a cartridge fitted
@@ -281,7 +281,7 @@ just pcb-fab v3       # KiCad DRC, then gerbers and drill files in v3-fab.zip
 In my run, `just pcb-fab v3` reported 0 errors and 18 warnings, one per
 footprint, each saying KiCad's configuration doesn't include the `tscircuit`
 footprint library. The footprints are embedded in the exported board, so the
-warnings don't affect the gerbers. It needs `kicad-cli`; with the Flatpak
+warnings don't affect the gerbers. `just pcb-fab` needs `kicad-cli`; with the Flatpak
 KiCad, clone somewhere under your home directory, since the sandbox can't see
 `/tmp`. `pcb/tools/` holds the copper clearance check and the step that
 finishes the files for fabrication. `pcb/test00` and the `probe` boards are
@@ -293,11 +293,10 @@ The parts on the v3 board: an ESP32-S3-DevKitC-1 N8R8, Adafruit's OV5640
 camera breakout (product 5840), Adafruit's 2.0-inch 320x240 TFT with microSD
 (product 4311), a pushbutton, a 4609X-101-103LF resistor network, a 10 uF
 capacitor and the 2x16 header. J3, a 4-pin header, is a spare port on the
-camera's I2C bus. `just pcb-parts` downloads the vendors' board
-files.
+camera's I2C bus. `just pcb-parts` downloads the vendors' board files.
 
 The firmware gives the camera no clock pin, so the OV5640 breakout has to run
-from its own oscillator. Adafruit's breakout has a jumper for that; on EXT
+from its own oscillator. Adafruit's breakout has a jumper for that, INT or EXT; on EXT
 the sensor never answers and looks exactly like a wiring fault.
 
 None of this runs without the board, so I haven't checked these steps in a
@@ -316,10 +315,9 @@ just console          # a serial console
 `just flash` uses `esptool` and expects the CircuitPython `.bin` under
 `vendor/`; download it from circuitpython.org for the
 `espressif_esp32s3_devkitc_1_n8r8` board. `just bootloader` puts the board in
-download mode, or hold BOOT and tap RST. `just boot`
-installs `src/boot.py`, which hides the CIRCUITPY drive at power-on so the
-camera can run unplugged; after that, `just devmode` brings the drive back for
-one boot.
+download mode, or hold BOOT and tap RST. `just boot` installs `src/boot.py`,
+which hides the CIRCUITPY drive at power-on so the camera can run unplugged;
+after that, `just devmode` brings the drive back for one boot.
 
 On a new board, the bring-up scripts check one stage at a time before the
 firmware: `just bringup 01` for the display, `03` for the camera, `03b` for a
