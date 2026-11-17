@@ -59,9 +59,10 @@ just sim      # 18 of 18 scenarios the same, in under 2 s
 just fuzz     # 0 of 200 seeds failed, in about 25 s
 just dev      # once: a .venv with the CircuitPython 10.3.0 stubs for this board
 just check    # ruff: All checks passed; pyright: 0 errors
+just test     # 8 tests of the runtime, OK
 ```
 
-`just sim` and `just fuzz` use only the standard library. For the phone app,
+`just sim`, `just fuzz` and `just test` use only the standard library. For the phone app,
 `just phone setup` then `just phone typecheck` installs it with pnpm and
 type-checks it; running it needs the Android SDK and a JDK (`just phone auth`
 says what's missing), and it has a fake camera you can switch on in the app.
@@ -134,8 +135,8 @@ them, not that either is right on the board.
 `src/code.py` is a tree of components (`Shutter`, `Saver`, `Card`, `Panel`,
 `Camera`, `Look`, `Link`, `Outbox`, `Settings`, `Review`) on
 `src/willow.py`, a small runtime based on Willow, a reactive programming model
-from my research that isn't published yet. No component calls another. They
-talk through events and state:
+from my research that isn't published yet. Components don't call their
+siblings; they talk through events and state:
 
 - `self.emit(label, payload)` runs every listener of that label before it
   returns. `bind`, `once`, `remove`, `after` and `cancel` take effect at once.
@@ -156,10 +157,14 @@ Under that rule, a debounce built as "cancel, then start a timer" on every
 change never fires (run it: `slow ends None` both times). In `src/willow.py`,
 a cancel only reaches a pending timer.
 
+`just test` runs 8 unit tests of these rules against `src/willow.py` on
+CPython.
+
 Hardware handles come in through each component's `open()`, which is what
-lets the simulator swap the hardware out. The main loop still schedules the
-work that shares a frame, the SPI bus and the radio, in the order the hardware
-needs. The board's pins are at the top of `src/code.py`, and its settings,
+lets the simulator swap the hardware out. `Main` builds the tree and wires the
+handles, and its loop, `Main.run()`, is the one place that calls components
+directly: it schedules the work that shares a frame, the SPI bus and the
+radio, in the order the hardware needs. The board's pins are at the top of `src/code.py`, and its settings,
 the ones the phone shows, are in the `SETTINGS` table below them.
 
 What happens on a press:
@@ -190,6 +195,26 @@ CircuitPython's `espcamera` wraps Espressif's C driver. Its binding has no
 autofocus and no register access, but the driver only holds the I2C bus during
 its own calls, so the firmware writes the sensor's clock registers itself
 between captures and writes them again after every size change.
+
+## Learned on the bench
+
+Some of the firmware and tooling only makes sense with what the board taught
+me:
+
+- **The sensor clock.** On EXT, the OV5640 never answers on I2C and holds its
+  data lines high-impedance, which looks exactly like a wiring fault. Hence
+  `external_clock_pin=None` and the INT jumper.
+- **Copying to the board.** A plain `cp` to CIRCUITPY while `code.py` runs is
+  silently lost, and a host-side compare still says it landed. `just push`
+  stops the program at the REPL over serial, writes the file, and checks it
+  from the board's side.
+- **A failed SD init.** If `sdcardio.SDCard()` fails on a bare pin, the next
+  garbage collection crashes. `Card.attach` keeps one `DigitalInOut` for the
+  chip select and reuses it.
+- **Bluetooth.** With more than one characteristic in a service, a soft reload
+  hard-faulted, so each BLE service has one characteristic.
+- **Power.** A dip in the supply, from a powered card insert or a bad USB
+  cable, browns the board out or drops it off USB with nothing logged.
 
 ## Bends
 
@@ -249,7 +274,8 @@ earlier test designs.
 The parts on the v3 board: an ESP32-S3-DevKitC-1 N8R8, Adafruit's OV5640
 camera breakout (product 5840), Adafruit's 2.0-inch 320x240 TFT with microSD
 (product 4311), a pushbutton, a 4609X-101-103LF resistor network, a 10 uF
-capacitor and the 2x16 header. `just pcb-parts` downloads the vendors' board
+capacitor and the 2x16 header. J3, a 4-pin header, is a spare port on the
+camera's I2C bus. `just pcb-parts` downloads the vendors' board
 files.
 
 The firmware gives the camera no clock pin, so the OV5640 breakout has to run
@@ -274,26 +300,6 @@ installs `src/boot.py`, which hides the CIRCUITPY drive at power-on so the
 camera can run unplugged; after that, `just devmode` brings the drive back for
 one boot. `just bringup <n>` runs one of the bring-up scripts instead of the
 firmware. `just --list` shows the rest.
-
-## Learned on the bench
-
-Some of the firmware and tooling only makes sense with what the board taught
-me:
-
-- **The sensor clock.** On EXT, the OV5640 never answers on I2C and holds its
-  data lines high-impedance, which looks exactly like a wiring fault. Hence
-  `external_clock_pin=None` and the INT jumper.
-- **Copying to the board.** A plain `cp` to CIRCUITPY while `code.py` runs is
-  silently lost, and a host-side compare still says it landed. `just push`
-  stops the program at the REPL over serial, writes the file, and checks it
-  from the board's side.
-- **A failed SD init.** If `sdcardio.SDCard()` fails on a bare pin, the next
-  garbage collection crashes. `Card.attach` keeps one `DigitalInOut` for the
-  chip select and reuses it.
-- **Bluetooth.** With more than one characteristic in a service, a soft reload
-  hard-faulted, so each BLE service has one characteristic.
-- **Power.** A dip in the supply, from a powered card insert or a bad USB
-  cable, browns the board out or drops it off USB with nothing logged.
 
 ## About this snapshot
 
