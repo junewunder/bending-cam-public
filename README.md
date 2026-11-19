@@ -28,6 +28,11 @@ works: it shows a live preview, takes photos, saves them to a microSD card
 and sends them to its Android phone app over Bluetooth. This repo is a
 snapshot of everything that went into it.
 
+If you have five minutes, `just sim` and `just fuzz` run on a laptop with no
+camera ([Try it without the camera](#try-it-without-the-camera)), and
+[docs/firmware.md](docs/firmware.md) starts with the four places in the code
+worth opening first.
+
 ## How a bend works
 
 Circuit bending is rewiring a cheap electronic device so that it misbehaves in
@@ -40,7 +45,8 @@ each. On the v3 board those eight wires don't go straight across. Each one
 stops at the cartridge header and starts again on the other side, and only a
 cartridge, a small plug-in board, joins the two halves. So the cartridge
 decides what the microcontroller sees, nothing is soldered, and a bend comes
-out when the cartridge does.
+out when the cartridge does. A bought camera gives you whatever points on its
+board you can find and reach. Here every bit of every pixel has its own pin.
 
 The cartridge that took the photos above is a DIP switch, a row of eight
 small switches, one per data line. A closed switch passes its line through. An
@@ -88,8 +94,8 @@ I built bendcam by directing AI coding agents. They wrote the code; I decided
 what the camera should do, tried it on the bench, and chose what got checked
 and how. Writing code got cheap that way, but reviewing it didn't, so the
 checks are where I put my own work: a simulator that runs the camera's
-software on a laptop against fake hardware, a fuzzer, and lint and type checks
-on the camera's software and the phone app.
+software on a laptop against fake hardware, a fuzzer, lint and type checks on
+the camera's software, and type checks on the phone app.
 
 The checks run on a laptop, and some things only the board could teach me:
 
@@ -98,11 +104,11 @@ The checks run on a laptop, and some things only the board could teach me:
   the module never answers, which looks exactly like a wiring fault.
 - Copying to the board. A plain file copy while the camera's program is
   running is silently lost, and comparing the files from the laptop still says
-  it landed. This repo's `just push` command stops the program, writes the
-  file, and checks it from the board's side.
+  it landed. This repo's `just push` command (`tools/push_code.py`) stops the
+  program, writes the file, and checks it from the board's side.
 - A failed SD card start. If the card fails to start, the board crashes at
   the next garbage collection, unless the firmware holds on to one of the
-  card's pins itself. So it does.
+  card's pins itself. So it does, in `Card.attach`.
 - Bluetooth. A Bluetooth service with more than one value in it crashed the
   board when the program reloaded, so each service has one.
 - Power. A dip in the supply, from pushing a card in or a bad USB cable,
@@ -116,7 +122,7 @@ The checks run on a laptop, and some things only the board could teach me:
 | Runtime | The small event and state library the firmware is written on | `src/willow.py` | 457 |
 | Bring-up scripts | One test per hardware stage, for a new board | `src/bringup/` | 972 |
 | Simulator, fuzzer, tests | Fake hardware, scripted runs, random runs, the runtime's tests | `tools/sim/` | 1,477 |
-| Phone app | Settings, photo transfer and review over Bluetooth, for Android | `phone/` | 3,730 |
+| Phone app | Settings, photo transfer and review over Bluetooth, for Android; type-checked, no tests | `phone/` | 3,730 |
 | Circuit board | The v3 board written as code, earlier test boards, fabrication tools | `pcb/` | 1,753 |
 | Host tools | Deploying to the board, Bluetooth from a laptop, bitmap to JPEG | `tools/`, `justfile` | 1,852 |
 
