@@ -8,8 +8,9 @@ bendcam is a digital camera I designed and built to be glitched on purpose.
   <img src="docs/photo-tree.jpg" width="20%" alt="A tree stump in pink with patches of blue and green">
 </p>
 
-*Three photos from the camera. Nothing was edited afterwards; all three were
-taken through the same bend cartridge.*
+*Three photos from the camera, as it saved them. All three were taken with the
+same plug-in cartridge fitted; [How a bend works](#how-a-bend-works) explains
+what that is.*
 
 <p>
   <img src="docs/camera-front.jpg" width="49%" alt="The camera from the front: a black circuit board with a screen, a shutter button and a microcontroller board">
@@ -18,13 +19,14 @@ taken through the same bend cartridge.*
 
 *The camera. On the front are the screen, the shutter button (top right), the
 microcontroller on its own small board (bottom), and between them the
-cartridge header, the two rows of black sockets, shown here with no cartridge
-fitted. The camera module looks out of the back.*
+cartridge header, the two rows of black sockets, shown here with nothing
+plugged in. The camera module, the small board that holds the lens and the
+sensor, looks out of the back.*
 
 One of these cameras exists. Its circuit board is called v3 here, and it
-works: it shows a live preview, takes photos, saves them to a
-microSD card and sends them to a phone over Bluetooth. This repo is a snapshot
-of everything that went into it, not a kit.
+works: it shows a live preview, takes photos, saves them to a microSD card
+and sends them to its Android phone app over Bluetooth. This repo is a
+snapshot of everything that went into it.
 
 ## How a bend works
 
@@ -46,33 +48,33 @@ open one cuts it, a resistor on the board holds the microcontroller's side
 low, and that bit reads 0 in every pixel. Different switch settings give
 different pictures.
 
-The header has 16 columns of two pins: row A goes to the camera module, row B
-to the microcontroller.
+The header has 16 columns of two pins. Row A goes to the camera module and
+row B to the microcontroller.
 
 | Column | 1-8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 |---|---|---|---|---|---|---|---|---|---|
 | Signal | D2-D9 | PCLK | HREF | VSYNC | GND | SDA | SCL | 3V3 | CART |
 | A and B joined on the board | no | yes | yes | yes | yes | yes | yes | yes | yes |
 
-Columns 1 to 8 are the data lines, and column 1 is at the right-hand end in
-the photo. Eight jumpers across them make a straight-through cartridge and a
-normal picture. A cartridge can also cross two lines over, or tie the
-microcontroller's side of a line to power or ground. The other columns carry
-timing, power and control signals, which the board joins itself. Swap
-cartridges with the power off: nothing keys the header, and a cartridge
-fitted one column over can short two of the camera module's outputs.
+Columns 1 to 8 are the eight data lines (D2 to D9), with column 1 at the
+right-hand end in the photo of the front. Eight plain links across them make
+a normal picture. A cartridge can also cross two lines over, so two bits of
+every pixel swap places. The other columns are timing, control and power,
+which the board joins itself, and CART, a spare line the camera's software
+doesn't read yet. Swap cartridges with the power off: a cartridge pushed in
+one column too far left or right can short two of the camera module's
+outputs.
 
 There is one bend in software too, a setting called `shift`. It draws each
 frame starting one byte late, so every pixel's two bytes are read across the
 boundary with its neighbour. The colour comes out in hard bands and the
-brightness mostly survives, so the picture stays readable. It changes the
-screen and the small copy of each photo, not the full-size one.
+brightness mostly survives. It changes the screen and the screen-sized copy
+saved with each photo, not the full-size one.
 
-Photos are saved as raw bitmaps, not JPEGs, because of the bends. The camera
-driver throws away any JPEG frame that doesn't start with the right three
-bytes, so with one data line cut, a JPEG capture times out on every shot. A
-raw frame has no framing to break and comes through bent. The phone app turns
-the bitmaps into JPEGs for the gallery.
+Photos are saved as raw bitmaps, not JPEGs, because of the bends. The library
+that reads the camera module throws away any JPEG that doesn't start with the
+right three bytes, so with one data line cut, every JPEG shot times out. A
+raw frame has no framing to break and comes through bent.
 
 ## How I built it
 
@@ -91,19 +93,19 @@ on the camera's software and the phone app.
 
 The checks run on a laptop, and some things only the board could teach me:
 
-- The camera module's clock. The module has a jumper for where its clock
-  comes from. On the wrong setting it never answers and leaves its data lines
-  floating, which looks exactly like a wiring fault.
+- The camera module's clock. A jumper on the module picks its own clock or
+  an outside one. Set to the outside one, which this camera doesn't supply,
+  the module never answers, which looks exactly like a wiring fault.
 - Copying to the board. A plain file copy while the camera's program is
   running is silently lost, and comparing the files from the laptop still says
-  it landed. `just push` stops the program, writes the file, and checks it
-  from the board's side.
+  it landed. This repo's `just push` command stops the program, writes the
+  file, and checks it from the board's side.
 - A failed SD card start. If the card fails to start, the board crashes at
-  the next garbage collection, unless the firmware keeps hold of the card's
-  select pin itself. So it keeps one pin object and reuses it.
+  the next garbage collection, unless the firmware holds on to one of the
+  card's pins itself. So it does.
 - Bluetooth. A Bluetooth service with more than one value in it crashed the
   board when the program reloaded, so each service has one.
-- Power. A dip in the supply, from pushing a card in or from a bad USB cable,
+- Power. A dip in the supply, from pushing a card in or a bad USB cable,
   resets the board or drops it off USB with nothing logged.
 
 ## What's in the repo
@@ -132,8 +134,7 @@ longer documents hold the detail:
 ## Try it without the camera
 
 You need [just](https://github.com/casey/just), Python 3.9 or newer, and
-[uv](https://docs.astral.sh/uv/) for the checks. These are the results on my
-laptop:
+[uv](https://docs.astral.sh/uv/). These are the results on my laptop:
 
 ```sh
 just sim      # 18 of 18 scenarios the same, in under 2 s
@@ -143,48 +144,43 @@ just check    # ruff: All checks passed; pyright: 0 errors
 just test     # 13 tests of the runtime, OK
 ```
 
-`just sim` takes two versions of the firmware, the `main` branch and your
-working copy by default, and runs each one on the laptop against fake
-hardware. It records every call that would have reached real hardware: what
-was drawn on the screen, what was written to the card, what was sent over
-Bluetooth. Each version goes through 18 scenarios, and a scenario is a script
-of events: shutter presses, the card pulled out in the middle of a save, a
-full card, a phone connecting and dropping. Then it compares the two
-recordings. A refactor should come back `same` on all 18, and a change in
-behaviour shows up as a difference to explain.
+`just sim` runs the simulator. It takes two versions of the firmware, the
+`main` branch and your working copy by default, and runs each on the laptop
+against fake hardware (Python stand-ins for the screen, the card, the camera
+module and the radio), recording every call that would have reached the real
+thing: what was drawn, what was written to the card, what went over
+Bluetooth. Each version goes through 18 scenarios. A scenario is a script of
+events, such as shutter presses, the card pulled out in the middle of a save,
+or a phone connecting and dropping. Then the two recordings are compared, and
+a refactor should come back `same` on all 18.
 
-`just fuzz` builds a random scenario per seed and checks each run against
-rules, with no second version to compare to: nothing crashes, no file is
-written twice, shot numbers only go up, every photo taken is either saved or
-reported lost.
+`just fuzz` runs the fuzzer: a random scenario per seed, checked against
+rules such as "no file is written twice" and "every photo taken is either
+saved or reported lost", with no second version.
 
-To see both catch a bug, make the shot counter stop advancing after the first
-shot. In `Card.claim` in `src/code.py`, change `self.seq += 1` to
-`self.seq = max(self.seq, 1)`:
+To see both catch a bug, break the number that goes in each photo's file
+name so it stops going up after the first shot. In the function `Card.claim`
+in `src/code.py`, change `self.seq += 1` to `self.seq = max(self.seq, 1)`:
 
 ```
 $ just sim
-...
-13 of 18 scenarios the same
+13 of 18 scenarios the same        (so 5 differ)
 $ just sim presses
 DIFF  presses        4498 vs 4498 lines
       -file rename /sd/_screen.tmp /sd/IMG_0002_screen.bmp
       +file rename /sd/_screen.tmp /sd/IMG_0001_screen.bmp
-      ...
 $ just fuzz --seeds 150
 FAIL seed 149: written twice: /sd/IMG_0001_screen.bmp; shot 1 after shot 1; ...
 120 of 150 seeds failed
 ```
 
-The fuzzer only checks its rules. When I made the counter never advance at
-all, no shot was ever taken, nothing broke a rule, and 0 of 150 seeds failed;
-`just sim` flagged 13 of 18 scenarios.
+The fuzzer only checks its rules. With a different bug, where that number
+never goes up at all, no shot is ever taken, no rule is broken, and 0 of 150
+seeds failed. For that bug, `just sim` found differences in 13 scenarios.
 
 The fake hardware was written from the same understanding of the real
-hardware as the firmware was. So `same` means two versions behave alike
-against the fakes, not that either is right on the board. Crashes inside the
-microcontroller, memory running short, and real radio and card timing still
-need the camera.
+hardware as the firmware. So `same` means two versions behave alike against
+the fakes, not that either is right on the board.
 
 ## Building one
 
@@ -192,13 +188,12 @@ The parts on the v3 board are an ESP32-S3-DevKitC-1 N8R8 (the
 microcontroller board), Adafruit's OV5640 camera breakout (the camera module,
 product 5840), Adafruit's 2.0-inch 320x240 screen with a microSD slot
 (product 4311), a pushbutton, an 8x10k resistor network, a 10 uF capacitor
-and the 2x16 header. All of it is through-hole, on a 100x100 mm two-layer
-board.
+and the 2x16 cartridge header.
 
 The board is written as code in `pcb/v3/v3.circuit.tsx`, and the files a
 board factory needs are generated from it.
 [docs/building.md](docs/building.md) has those commands, the steps to put the
-firmware on a board, and the tests to run on a new board one stage at a time.
+firmware on a board, and how to use the bring-up scripts on a new board.
 
 What a stranger doesn't get here: there are no design files for a cartridge
 and no parts prices, and I haven't run the firmware steps on a second board.
