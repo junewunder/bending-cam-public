@@ -443,6 +443,10 @@ pcb-export board="test00": _tsci
 pcb-review board="test00": (pcb-export board)
     #!/usr/bin/env bash
     set -euo pipefail
+    if [ ! -f .claude/skills/kicad/scripts/analyze_pcb.py ]; then
+        echo "pcb-review needs the kicad-happy scripts, which this repo doesn't carry: run 'just skills-update' first" >&2
+        exit 1
+    fi
     python3 .claude/skills/kicad/scripts/analyze_pcb.py \
         "pcb/dist/export/{{board}}.kicad_pcb" --text --stage layout
 
