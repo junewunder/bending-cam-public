@@ -1297,7 +1297,7 @@ class Card(Component):
             print("!! sd bus/pin conflict:", err)
             return None
         except OSError as err:
-            print("!! sd unusable:", err, "-- see memory/sd-bring-up.md")
+            print("!! sd unusable:", err)
             return None
         try:
             storage.mount(storage.VfsFat(sd), SD_MOUNT)
