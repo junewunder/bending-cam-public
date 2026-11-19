@@ -23,10 +23,10 @@ cartridge header, the two rows of black sockets, shown here with nothing
 plugged in. The camera module, the small board that holds the lens and the
 sensor, looks out of the back.*
 
-One of these cameras exists. Its circuit board is called v3 here, and it
-works: it shows a live preview, takes photos, saves them to a microSD card
+Four of these cameras exist so far. The circuit board is called v3 here,
+and it works: it shows a live preview, takes photos, saves them to a microSD card
 and sends them to its Android phone app over Bluetooth. This repo is a
-snapshot of everything that went into it.
+snapshot of everything that went into them.
 
 If you have five minutes, `just sim` and `just fuzz` run on a laptop with no
 camera ([Try it without the camera](#try-it-without-the-camera)), and
