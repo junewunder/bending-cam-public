@@ -51,7 +51,8 @@ of its 16 columns has two pins: row A goes to the camera, row B to the ESP32.
 | Signal | D2-D9 | PCLK | HREF | VSYNC | GND | SDA | SCL | 3V3 | CART |
 | A and B joined on the board | no | yes | yes | yes | yes | yes | yes | yes | yes |
 
-Column 1 is at the right-hand end, as in the render above and in the photo in the README. For the eight data
+Column 1 is at the right-hand end, as in the render above and in the photo in
+the README. For the eight data
 lines (D2 to D9), only a cartridge joins A to B. Eight jumper shunts across
 columns 1 to 8 make a straight-through cartridge and a normal picture; from
 there a cartridge can cross bits over, tie the ESP32's side to 3V3 or GND,

@@ -31,7 +31,8 @@ snapshot of everything that went into it.
 If you have five minutes, `just sim` and `just fuzz` run on a laptop with no
 camera ([Try it without the camera](#try-it-without-the-camera)), and
 [docs/firmware.md](docs/firmware.md) starts with the four places in the code
-worth opening first.
+worth opening first. If you want to build one, start at
+[Building one](#building-one).
 
 ## How a bend works
 
@@ -54,22 +55,9 @@ open one cuts it, a resistor on the board holds the microcontroller's side
 low, and that bit reads 0 in every pixel. Different switch settings give
 different pictures.
 
-The header has 16 columns of two pins. Row A goes to the camera module and
-row B to the microcontroller.
-
-| Column | 1-8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
-|---|---|---|---|---|---|---|---|---|---|
-| Signal | D2-D9 | PCLK | HREF | VSYNC | GND | SDA | SCL | 3V3 | CART |
-| A and B joined on the board | no | yes | yes | yes | yes | yes | yes | yes | yes |
-
-Columns 1 to 8 are the eight data lines (D2 to D9), with column 1 at the
-right-hand end in the photo of the front. Eight plain links across them make
-a normal picture. A cartridge can also cross two lines over, so two bits of
-every pixel swap places. The other columns are timing, control and power,
-which the board joins itself, and CART, a spare line the camera's software
-doesn't read yet. Swap cartridges with the power off: a cartridge pushed in
-one column too far left or right can short two of the camera module's
-outputs.
+Eight plain links in place of the switches make a normal picture, and a
+cartridge can also cross two lines over, so two bits of every pixel swap
+places. The header's pin table is in [docs/building.md](docs/building.md).
 
 There is one bend in software too, a setting called `shift`. It draws each
 frame starting one byte late, so every pixel's two bytes are read across the
@@ -119,7 +107,7 @@ The checks run on a laptop, and some things only the board could teach me:
 | Part | What it does | Where | Lines |
 |---|---|---|---|
 | Firmware | The camera's own software: preview, shutter, saving, settings, Bluetooth, crash recovery | `src/code.py` | 2,613 |
-| Runtime | The small event and state library the firmware is written on | `src/willow.py` | 457 |
+| Runtime | The small event and state library the firmware is written on, with 13 unit tests of its rules | `src/willow.py` | 457 |
 | Bring-up scripts | One test per hardware stage, for a new board | `src/bringup/` | 972 |
 | Simulator, fuzzer, tests | Fake hardware, scripted runs, random runs, the runtime's tests | `tools/sim/` | 1,477 |
 | Phone app | Settings, photo transfer and review over Bluetooth, for Android; type-checked, no tests | `phone/` | 3,730 |
@@ -132,8 +120,8 @@ longer documents hold the detail:
 - [docs/simulator.md](docs/simulator.md): how the simulator and the fuzzer
   work, and what they can't see.
 - [docs/firmware.md](docs/firmware.md): how the firmware is put together,
-  what happens when you press the shutter, and where to start reading the
-  code.
+  what happens when you press the shutter, how it recovers from crashes
+  and stalls, and where to start reading the code.
 - [docs/building.md](docs/building.md): the circuit board, the parts, and
   getting the firmware onto a board.
 
@@ -194,7 +182,9 @@ The parts on the v3 board are an ESP32-S3-DevKitC-1 N8R8 (the
 microcontroller board), Adafruit's OV5640 camera breakout (the camera module,
 product 5840), Adafruit's 2.0-inch 320x240 screen with a microSD slot
 (product 4311), a pushbutton, an 8x10k resistor network, a 10 uF capacitor
-and the 2x16 cartridge header.
+and the 2x16 cartridge header. The v3 board is a carrier: the three bought
+boards plug into it, and it has no power circuit of its own, running from
+the microcontroller board's USB port.
 
 The board is written as code in `pcb/v3/v3.circuit.tsx`, and the files a
 board factory needs are generated from it.
